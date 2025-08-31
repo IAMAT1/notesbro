@@ -5,6 +5,7 @@ import { insertNoteSchema, loginSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import session from "express-session";
+import { generateToken, verifyToken } from "../shared/auth-utils";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session middleware for security
@@ -50,12 +51,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: user.role 
       };
 
+      // Also generate JWT token for consistency with Netlify
+      const authUser = {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      };
+      const token = generateToken(authUser);
+
       res.json({ 
-        user: { 
-          id: user.id, 
-          username: user.username, 
-          role: user.role 
-        } 
+        user: authUser,
+        token
       });
     } catch (error) {
       res.status(400).json({ message: "Invalid request data" });
