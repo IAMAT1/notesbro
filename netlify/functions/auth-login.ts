@@ -32,6 +32,36 @@ export const handler: Handler = async (event, context) => {
     // Initialize default data on first login attempt
     await initializeDefaultData();
     
+    // If trying to login as admin with admin123, and no admin exists, create one
+    if (username === 'admin' && password === 'admin123') {
+      const [existingUser] = await db.select().from(users).where(eq(users.username, 'admin'));
+      if (!existingUser) {
+        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const [newUser] = await db.insert(users).values({
+          username: 'admin',
+          password: hashedPassword,
+          role: 'admin'
+        }).returning();
+        
+        const authUser = {
+          id: newUser.id,
+          username: newUser.username,
+          role: newUser.role,
+        };
+        
+        const token = generateToken(authUser);
+        
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            user: authUser,
+            token,
+          }),
+        };
+      }
+    }
+    
     const [user] = await db.select().from(users).where(eq(users.username, username));
     if (!user) {
       return {
