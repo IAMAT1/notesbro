@@ -26,11 +26,11 @@ export const handler: Handler = async (event, context) => {
   }
 
   try {
-    // Initialize default data on first request
-    await initializeDefaultData();
-    
     const body = JSON.parse(event.body || '{}');
     const { username, password } = loginSchema.parse(body);
+    
+    // Initialize default data on first login attempt
+    await initializeDefaultData();
     
     const [user] = await db.select().from(users).where(eq(users.username, username));
     if (!user) {
