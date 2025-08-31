@@ -1,0 +1,5 @@
+/api/auth/login /.netlify/functions/auth-login 200
+/api/auth/logout /.netlify/functions/auth-logout 200
+/api/notes/:id /.netlify/functions/notes-detail/:id 200
+/api/notes /.netlify/functions/notes 200
+/* /index.html 200

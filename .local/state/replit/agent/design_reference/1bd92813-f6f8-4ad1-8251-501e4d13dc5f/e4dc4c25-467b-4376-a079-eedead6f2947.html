@@ -1,0 +1,557 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes Bro - Your Study Companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                }
+            }
+        }
+    };
+    </script>
+    <style>
+        :root {
+            --background: hsl(210 20% 98%);
+            --foreground: hsl(222.2 84% 4.9%);
+            --card: hsl(0 0% 100%);
+            --card-foreground: hsl(222.2 84% 4.9%);
+            --primary: hsl(122 39% 19%);
+            --primary-foreground: hsl(0 0% 98%);
+            --secondary: hsl(122 39% 65%);
+            --secondary-foreground: hsl(122 39% 19%);
+            --muted: hsl(210 40% 96%);
+            --muted-foreground: hsl(215.4 16.3% 46.9%);
+            --accent: hsl(120 100% 50%);
+            --accent-foreground: hsl(222.2 84% 4.9%);
+            --border: hsl(214.3 31.8% 91.4%);
+            --input: hsl(214.3 31.8% 91.4%);
+            --ring: hsl(122 39% 19%);
+            --radius: 0.75rem;
+        }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-in-out;
+        }
+        
+        .animate-slide-up {
+            animation: slideUp 0.8s ease-out;
+        }
+        
+        .animate-bounce-subtle {
+            animation: bounceSubtle 2s infinite;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes bounceSubtle {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-5px); }
+            60% { transform: translateY(-3px); }
+        }
+        
+        .hover-lift {
+            transition: all 0.3s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #1B5E20, #00FF41);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .neon-glow {
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+        
+        .admin-panel {
+            display: none;
+        }
+        
+        .admin-panel.active {
+            display: block;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-background text-foreground min-h-screen">
+    <!-- Navigation -->
+    <!-- @COMPONENT: Navigation [responsive navigation with mobile menu] -->
+    <nav class="bg-card border-b border-border sticky top-0 z-50 backdrop-blur-sm bg-card/95">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-graduation-cap text-2xl text-primary"></i>
+                    <span class="text-2xl font-bold gradient-text">Notes Bro</span>
+                </div>
+                
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#home" class="text-foreground hover:text-primary transition-colors">Home</a>
+                    <a href="#subjects" class="text-foreground hover:text-primary transition-colors">Subjects</a>
+                    <a href="#about" class="text-foreground hover:text-primary transition-colors">About</a>
+                    <a href="#contact" class="text-foreground hover:text-primary transition-colors">Contact</a>
+                    <button onclick="toggleAdminPanel()" class="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-user-shield mr-2"></i>Admin
+                    </button>
+                </div>
+                
+                <button class="md:hidden text-foreground">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+    <!-- @END_COMPONENT: Navigation -->
+
+    <!-- Admin Panel (Hidden by default) -->
+    <!-- @COMPONENT: AdminPanel [admin dashboard for content management] -->
+    <div id="adminPanel" class="admin-panel fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div class="bg-card p-8 rounded-xl max-w-2xl w-full mx-4 animate-fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-primary">Admin Dashboard</h2>
+                <button onclick="toggleAdminPanel()" class="text-muted-foreground hover:text-foreground">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Admin Login Form -->
+            <div id="adminLogin" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Admin Username</label>
+                    <input type="text" class="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Enter username">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Password</label>
+                    <input type="password" class="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Enter password">
+                </div>
+                <button onclick="showAdminDashboard()" class="w-full bg-primary text-primary-foreground py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                    Login
+                </button>
+            </div>
+            
+            <!-- Admin Dashboard Content (Hidden initially) -->
+            <div id="adminDashboard" style="display: none;">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-secondary/10 p-4 rounded-lg">
+                        <h3 class="font-semibold text-primary mb-2">Total Notes</h3>
+                        <p class="text-2xl font-bold" data-mock="true">247</p>
+                    </div>
+                    <div class="bg-accent/10 p-4 rounded-lg">
+                        <h3 class="font-semibold text-primary mb-2">Active Students</h3>
+                        <p class="text-2xl font-bold" data-mock="true">1,234</p>
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <h3 class="text-lg font-semibold">Add New Note</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <select class="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary">
+                            <option>Select Class</option>
+                            <option>Class 9</option>
+                            <option>Class 10</option>
+                            <option>Class 11</option>
+                            <option>Class 12</option>
+                        </select>
+                        <select class="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary">
+                            <option>Select Subject</option>
+                            <option>Mathematics</option>
+                            <option>Physics</option>
+                            <option>Chemistry</option>
+                            <option>Biology</option>
+                        </select>
+                    </div>
+                    <input type="text" placeholder="Note Title" class="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary">
+                    <input type="url" placeholder="Google Drive Link" class="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary">
+                    <button class="bg-accent text-accent-foreground px-6 py-2 rounded-lg hover:bg-accent/90 transition-colors">
+                        Add Note
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AdminPanel -->
+
+    <!-- Hero Section -->
+    <!-- @COMPONENT: HeroSection [main landing section with CTA] -->
+    <section class="relative overflow-hidden py-20 bg-gradient-to-br from-primary/5 to-secondary/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center animate-fade-in">
+                <h1 class="text-5xl md:text-6xl font-bold mb-6">
+                    Welcome to <span class="gradient-text">Notes Bro</span>
+                </h1>
+                <p class="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+                    Your ultimate study companion for premium notes, one-pagers, and animated learning materials. 
+                    Ace your exams with our comprehensive note collection.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button class="bg-primary text-primary-foreground px-8 py-4 rounded-xl text-lg font-semibold hover-lift neon-glow">
+                        <i class="fas fa-rocket mr-2"></i>Start Learning
+                    </button>
+                    <button class="border-2 border-primary text-primary px-8 py-4 rounded-xl text-lg font-semibold hover:bg-primary hover:text-primary-foreground transition-all">
+                        <i class="fas fa-play mr-2"></i>Watch Demo
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Floating Icons Animation -->
+        <div class="absolute top-20 left-10 text-secondary/30 animate-bounce-subtle">
+            <i class="fas fa-book text-3xl"></i>
+        </div>
+        <div class="absolute top-40 right-20 text-accent/30 animate-bounce-subtle" style="animation-delay: 0.5s">
+            <i class="fas fa-lightbulb text-2xl"></i>
+        </div>
+        <div class="absolute bottom-20 left-20 text-primary/30 animate-bounce-subtle" style="animation-delay: 1s">
+            <i class="fas fa-graduation-cap text-4xl"></i>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: HeroSection -->
+
+    <!-- Notes Search Section -->
+    <!-- @COMPONENT: NotesSearch [main search and filter interface] -->
+    <section class="py-16 bg-card" id="subjects">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12 animate-slide-up">
+                <h2 class="text-4xl font-bold mb-4 gradient-text">Find Your Perfect Notes</h2>
+                <p class="text-lg text-muted-foreground">Search through our comprehensive collection of study materials</p>
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="max-w-2xl mx-auto mb-8 animate-slide-up">
+                <div class="relative">
+                    <input type="text" placeholder="Search for notes, subjects, or topics..." 
+                           class="w-full px-6 py-4 pl-12 text-lg border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
+                </div>
+            </div>
+            
+            <!-- Filter Dropdowns -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 animate-slide-up">
+                <select class="px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary text-center">
+                    <option>Select Class</option>
+                    <option>Class 9</option>
+                    <option>Class 10</option>
+                    <option>Class 11</option>
+                    <option>Class 12</option>
+                </select>
+                
+                <select class="px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary text-center">
+                    <option>Select Subject</option>
+                    <option>Mathematics</option>
+                    <option>Physics</option>
+                    <option>Chemistry</option>
+                    <option>Biology</option>
+                    <option>English</option>
+                    <option>History</option>
+                </select>
+                
+                <select class="px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary text-center">
+                    <option>Note Type</option>
+                    <option>Premium Notes</option>
+                    <option>One Pager</option>
+                    <option>Animated</option>
+                    <option>Typed Notes</option>
+                </select>
+                
+                <button class="bg-accent text-accent-foreground px-6 py-3 rounded-lg font-semibold hover:bg-accent/90 transition-colors">
+                    <i class="fas fa-filter mr-2"></i>Apply Filters
+                </button>
+            </div>
+            
+            <!-- Note Results Grid -->
+            <!-- @MAP: filteredNotes.map(note => ( -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
+                <div class="bg-card border border-border rounded-xl p-6 hover-lift">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">Class 10</span>
+                        <span class="bg-accent/10 text-accent px-3 py-1 rounded-full text-sm font-medium">Premium</span>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2" data-bind="note.title" data-mock="true">Mathematics - Quadratic Equations</h3>
+                    <p class="text-muted-foreground mb-4" data-mock="true">Complete chapter notes with solved examples and practice problems</p>
+                    <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+                            data-event="click:redirectToNotes" data-implementation="Should redirect to Google Drive link">
+                        <i class="fas fa-download mr-2"></i>Get Notes
+                    </button>
+                </div>
+                
+                <div class="bg-card border border-border rounded-xl p-6 hover-lift">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">Class 11</span>
+                        <span class="bg-secondary/10 text-secondary px-3 py-1 rounded-full text-sm font-medium">One Pager</span>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2" data-mock="true">Physics - Laws of Motion</h3>
+                    <p class="text-muted-foreground mb-4" data-mock="true">Concise summary of Newton's laws with key formulas and concepts</p>
+                    <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-download mr-2"></i>Get Notes
+                    </button>
+                </div>
+                
+                <div class="bg-card border border-border rounded-xl p-6 hover-lift">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">Class 12</span>
+                        <span class="bg-accent/10 text-accent px-3 py-1 rounded-full text-sm font-medium">Animated</span>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2" data-mock="true">Chemistry - Organic Reactions</h3>
+                    <p class="text-muted-foreground mb-4" data-mock="true">Interactive animated notes showing reaction mechanisms</p>
+                    <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors">
+                        <i class="fas fa-download mr-2"></i>Get Notes
+                    </button>
+                </div>
+            </div>
+            <!-- @END_MAP )) -->
+        </div>
+    </section>
+    <!-- @END_COMPONENT: NotesSearch -->
+
+    <!-- Features Section -->
+    <!-- @COMPONENT: FeaturesSection [showcase of platform benefits] -->
+    <section class="py-16 bg-muted/50">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12 animate-slide-up">
+                <h2 class="text-4xl font-bold mb-4 gradient-text">Why Choose Notes Bro?</h2>
+                <p class="text-lg text-muted-foreground">Discover what makes us the best study companion</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="text-center hover-lift">
+                    <div class="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-star text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Premium Quality</h3>
+                    <p class="text-muted-foreground">Expertly crafted notes by experienced educators</p>
+                </div>
+                
+                <div class="text-center hover-lift">
+                    <div class="bg-secondary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-clock text-2xl text-secondary"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Save Time</h3>
+                    <p class="text-muted-foreground">Quick access to organized, comprehensive study materials</p>
+                </div>
+                
+                <div class="text-center hover-lift">
+                    <div class="bg-accent/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-mobile-alt text-2xl text-accent"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Mobile Friendly</h3>
+                    <p class="text-muted-foreground">Study anywhere, anytime with our responsive platform</p>
+                </div>
+                
+                <div class="text-center hover-lift">
+                    <div class="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-users text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Community</h3>
+                    <p class="text-muted-foreground">Join thousands of successful students</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: FeaturesSection -->
+
+    <!-- AdSense Compatible Ad Slot -->
+    <!-- @COMPONENT: AdSlot [placeholder for Google AdSense integration] -->
+    <section class="py-8 bg-card">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="bg-muted/30 border-2 border-dashed border-border rounded-lg p-8 text-center">
+                <p class="text-muted-foreground text-sm mb-2">Advertisement Space</p>
+                <p class="text-xs text-muted-foreground">Google AdSense integration ready</p>
+                <!-- TODO: Replace with actual AdSense code -->
+                <div class="w-full h-24 bg-muted/50 rounded-lg flex items-center justify-center" data-implementation="Google AdSense ad unit">
+                    <span class="text-muted-foreground text-sm">AdSense Banner (728x90)</span>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: AdSlot -->
+
+    <!-- Footer -->
+    <!-- @COMPONENT: Footer [site footer with links and branding] -->
+    <footer class="bg-primary text-primary-foreground py-12">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <i class="fas fa-graduation-cap text-2xl"></i>
+                        <span class="text-2xl font-bold">Notes Bro</span>
+                    </div>
+                    <p class="text-primary-foreground/80">Your trusted study companion for academic success.</p>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">Quick Links</h4>
+                    <ul class="space-y-2 text-primary-foreground/80">
+                        <li><a href="#" class="hover:text-accent transition-colors">Home</a></li>
+                        <li><a href="#" class="hover:text-accent transition-colors">Subjects</a></li>
+                        <li><a href="#" class="hover:text-accent transition-colors">Premium Notes</a></li>
+                        <li><a href="#" class="hover:text-accent transition-colors">One Pagers</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">Support</h4>
+                    <ul class="space-y-2 text-primary-foreground/80">
+                        <li><a href="#" class="hover:text-accent transition-colors">Help Center</a></li>
+                        <li><a href="#" class="hover:text-accent transition-colors">Contact Us</a></li>
+                        <li><a href="#" class="hover:text-accent transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-accent transition-colors">Terms of Service</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">Connect</h4>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-primary-foreground/80 hover:text-accent transition-colors">
+                            <i class="fab fa-facebook text-xl"></i>
+                        </a>
+                        <a href="#" class="text-primary-foreground/80 hover:text-accent transition-colors">
+                            <i class="fab fa-twitter text-xl"></i>
+                        </a>
+                        <a href="#" class="text-primary-foreground/80 hover:text-accent transition-colors">
+                            <i class="fab fa-instagram text-xl"></i>
+                        </a>
+                        <a href="#" class="text-primary-foreground/80 hover:text-accent transition-colors">
+                            <i class="fab fa-youtube text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-primary-foreground/20 mt-8 pt-8 text-center">
+                <p class="text-primary-foreground/80">© 2024 <span class="text-accent">Notes Bro</span>. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+    <!-- @END_COMPONENT: Footer -->
+
+    <script>
+        // Admin Panel Management
+        function toggleAdminPanel() {
+            const panel = document.getElementById('adminPanel');
+            panel.classList.toggle('active');
+        }
+
+        function showAdminDashboard() {
+            // TODO: Implement actual authentication
+            document.getElementById('adminLogin').style.display = 'none';
+            document.getElementById('adminDashboard').style.display = 'block';
+        }
+
+        // Smooth scrolling for navigation links
+        (() => {
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+        })();
+
+        // Search functionality placeholder
+        (() => {
+            const searchInput = document.querySelector('input[placeholder*="Search"]');
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    // TODO: Implement real-time search functionality
+                    console.log('Search query:', e.target.value);
+                });
+            }
+        })();
+
+        // Note download functionality
+        (() => {
+            document.querySelectorAll('button:contains("Get Notes")').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    // TODO: Implement Google Drive redirection
+                    console.log('Redirecting to Google Drive link');
+                    // window.open(driveLink, '_blank');
+                });
+            });
+        })();
+
+        // Animation on scroll
+        (() => {
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.animate-slide-up').forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(30px)';
+                el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                observer.observe(el);
+            });
+        })();
+    </script>
+</body>
+</html>
