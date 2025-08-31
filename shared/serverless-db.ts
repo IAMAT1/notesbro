@@ -22,17 +22,19 @@ export async function initializeDefaultData() {
     const { eq } = await import('drizzle-orm');
     
     // Check if admin user exists
-    const [existingAdmin] = await db.select().from(users).where(eq(users.username, "admin"));
-    if (!existingAdmin) {
+    const existingUsers = await db.select().from(users).where(eq(users.username, "admin"));
+    if (existingUsers.length === 0) {
       // Create default admin user with hashed password
       const hashedPassword = await bcrypt.default.hash("admin123", 10);
-      await db.insert(users).values({
+      const [newUser] = await db.insert(users).values({
         username: "admin",
         password: hashedPassword,
         role: "admin"
-      });
+      }).returning();
+      console.log("Created admin user:", newUser.username);
     }
   } catch (error) {
     console.error("Error initializing default data:", error);
+    throw error; // Re-throw to see the actual error
   }
 }
