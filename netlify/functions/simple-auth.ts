@@ -1,7 +1,3 @@
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'notes-bro-jwt-secret-2025';
-
 export async function handler(event: any) {
   // Allow CORS
   if (event.httpMethod === 'OPTIONS') {
@@ -28,21 +24,16 @@ export async function handler(event: any) {
     
     // Hardcoded admin login for testing
     if (body.username === 'admin' && body.password === 'admin123') {
-      const user = {
-        id: 'admin-1',
-        username: 'admin',
-        role: 'admin'
-      };
-      
-      // Generate a real JWT token
-      const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
-      
       return {
         statusCode: 200,
         headers: { 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify({
-          user,
-          token
+          user: {
+            id: 'admin-1',
+            username: 'admin',
+            role: 'admin'
+          },
+          token: 'fake-jwt-token-for-testing'
         }),
       };
     }
