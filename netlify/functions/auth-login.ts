@@ -1,142 +1,189 @@
-import { Handler } from '@netlify/functions';
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
-import { pgTable, text, varchar } from 'drizzle-orm/pg-core';
-import { eq, sql } from 'drizzle-orm';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { notes, insertNoteSchema } from '../../shared/schema';
+import { eq, and, ilike, or, type SQL } from 'drizzle-orm';
+import { z } from 'zod';
+import { verifyToken, extractTokenFromEvent } from '../../shared/auth-utils';
 
-// Configure for serverless
+// Configure for serverless environment
 neonConfig.fetchConnectionCache = true;
+neonConfig.useSecureWebSocket = false;
+neonConfig.pipelineConnect = false;
 
-// Define schema directly in function to avoid import issues
-const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  role: text("role").notNull().default("student"),
-});
-
-const JWT_SECRET = process.env.JWT_SECRET || 'notes-bro-jwt-secret-2025';
-
-export const handler: Handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
-
+export const handler = async (event: any) => {
+  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers };
-  }
-
-  if (event.httpMethod !== 'POST') {
     return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ message: 'Method not allowed' }),
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      },
+      body: ''
     };
   }
 
+  let pool: any;
   try {
+    // Create database connection locally for Netlify
     if (!process.env.DATABASE_URL) {
       return {
         statusCode: 500,
-        headers,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ message: 'Database not configured' }),
       };
     }
 
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const db = drizzle({ client: pool });
+    // GET /api/notes - Get all notes with optional filters
+    if (event.httpMethod === 'GET') {
+      const { search, class: cls, subject, noteType } = event.queryStringParameters || {};
+      
+      const conditions: SQL<unknown>[] = [];
+      
+      if (search) {
+        conditions.push(
+          or(
+            ilike(notes.title, `%${search}%`),
+            ilike(notes.description, `%${search}%`)
+          )!
+        );
+      }
+      
+      if (cls) {
+        conditions.push(eq(notes.class, cls));
+      }
+      
+      if (subject) {
+        conditions.push(eq(notes.subject, subject));
+      }
+      
+      if (noteType) {
+        conditions.push(eq(notes.noteType, noteType));
+      }
+      
+      let result;
+      if (conditions.length === 0) {
+        result = await db.select().from(notes);
+      } else {
+        result = await db.select().from(notes).where(
+          conditions.length === 1 ? conditions[0] : and(...conditions)
+        );
+      }
+      
+      return {
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(result),
+      };
+    }
 
-    const body = JSON.parse(event.body || '{}');
-    const { username, password } = body;
+    // POST /api/notes - Create a new note (admin only)
+    if (event.httpMethod === 'POST') {
+      const token = extractTokenFromEvent(event);
+      
+      console.log('Extracted token:', token ? 'present' : 'missing');
+      
+      if (!token) {
+        return {
+          statusCode: 401,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: 'Authorization token required' }),
+        };
+      }
+      
+      // Check for hardcoded admin token first (for simple auth)
+      if (token === 'VALID_ADMIN_TOKEN_2025') {
+        console.log('Using hardcoded admin token');
+      } else {
+        // Try JWT verification
+        const user = verifyToken(token);
+        console.log('Verified user:', user ? user.username : 'invalid');
+        
+        if (!user || user.role !== 'admin') {
+          return {
+            statusCode: 401,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: 'Admin access required' }),
+          };
+        }
+      }
+      
+      const body = JSON.parse(event.body || '{}');
+      console.log('Note data:', body);
+      
+      const noteData = insertNoteSchema.parse(body);
+      
+      const [note] = await db
+        .insert(notes)
+        .values(noteData)
+        .returning();
+        
+      console.log('Created note:', note);
+        
+      return {
+        statusCode: 201,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(note),
+      };
+    }
 
-    if (!username || !password) {
+    return {
+      statusCode: 405,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message: 'Method not allowed' }),
+    };
+    
+  } catch (error) {
+    console.error('Notes API error:', error);
+    
+    if (error instanceof z.ZodError) {
       return {
         statusCode: 400,
-        headers,
-        body: JSON.stringify({ message: 'Username and password required' }),
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: 'Invalid data', errors: error.errors }),
       };
     }
-
-    // Special case: if logging in as admin/admin123, create the user if it doesn't exist
-    if (username === 'admin' && password === 'admin123') {
-      try {
-        // Try to create tables if they don't exist
-        await db.execute(sql`
-          CREATE TABLE IF NOT EXISTS users (
-            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'student'
-          )
-        `);
-
-        // Check if admin exists
-        const existingUsers = await db.execute(sql`SELECT * FROM users WHERE username = 'admin'`);
-        
-        if (!existingUsers.rows || existingUsers.rows.length === 0) {
-          // Create admin user
-          const hashedPassword = await bcrypt.hash('admin123', 10);
-          await db.execute(sql`
-            INSERT INTO users (username, password, role) 
-            VALUES ('admin', ${hashedPassword}, 'admin')
-          `);
-        }
-      } catch (createError) {
-        console.error('Error creating admin user:', createError);
-      }
-    }
-
-    // Now try to login
-    const userResult = await db.execute(sql`SELECT * FROM users WHERE username = ${username}`);
     
-    if (!userResult.rows || userResult.rows.length === 0) {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ message: 'Invalid credentials' }),
-      };
-    }
-
-    const user = userResult.rows[0] as any;
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    
-    if (!isPasswordValid) {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ message: 'Invalid credentials' }),
-      };
-    }
-
-    const authUser = {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-    };
-    
-    const token = jwt.sign(authUser, JWT_SECRET, { expiresIn: '24h' });
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        user: authUser,
-        token,
-      }),
-    };
-  } catch (error) {
-    console.error('Login error:', error);
     return {
       statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        message: 'Login failed', 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }),
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message: 'Internal server error', error: error.message }),
     };
+  } finally {
+    // Clean up database connection
+    try {
+      if (pool) {
+        await pool.end();
+      }
+    } catch (cleanupError) {
+      console.error('Error cleaning up database connection:', cleanupError);
+    }
   }
 };
