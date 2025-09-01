@@ -79,10 +79,15 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
         description: "Note created successfully!",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Create note error:", error);
+      let errorMessage = "Failed to create note. Please try again.";
+      if (error?.message) {
+        errorMessage = error.message;
+      }
       toast({
         title: "Error",
-        description: "Failed to create note. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
