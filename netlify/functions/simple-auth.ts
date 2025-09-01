@@ -1,4 +1,6 @@
-import { generateToken } from '../../shared/auth-utils';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'notes-bro-jwt-secret-2025';
 
 export async function handler(event: any) {
   // Allow CORS
@@ -33,7 +35,7 @@ export async function handler(event: any) {
       };
       
       // Generate a real JWT token
-      const token = generateToken(user);
+      const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
       
       return {
         statusCode: 200,
