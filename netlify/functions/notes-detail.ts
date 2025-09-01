@@ -1,7 +1,9 @@
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
-import { notes } from '../../shared/schema';
+import { notes, insertNoteSchema } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
+import { verifyToken, extractTokenFromEvent } from '../../shared/auth-utils';
 
 export const handler = async (event: any) => {
   // Handle CORS preflight
@@ -11,7 +13,7 @@ export const handler = async (event: any) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
       },
       body: ''
     };
@@ -68,6 +70,71 @@ export const handler = async (event: any) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(note),
+      };
+    }
+
+    // PUT /api/notes/:id - Update note (admin only)
+    if (event.httpMethod === 'PUT') {
+      const token = extractTokenFromEvent(event);
+      
+      if (!token) {
+        return {
+          statusCode: 401,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: 'Authorization token required' }),
+        };
+      }
+      
+      // Check for hardcoded admin token first (for simple auth)
+      if (token === 'VALID_ADMIN_TOKEN_2025') {
+        console.log('Using hardcoded admin token');
+      } else {
+        // Try JWT verification
+        const user = verifyToken(token);
+        console.log('Verified user:', user ? user.username : 'invalid');
+        
+        if (!user || user.role !== 'admin') {
+          return {
+            statusCode: 401,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: 'Admin access required' }),
+          };
+        }
+      }
+      
+      const body = JSON.parse(event.body || '{}');
+      const noteData = insertNoteSchema.parse(body);
+      
+      const [updatedNote] = await db
+        .update(notes)
+        .set(noteData)
+        .where(eq(notes.id, noteId))
+        .returning();
+      
+      if (!updatedNote) {
+        return {
+          statusCode: 404,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: 'Note not found' }),
+        };
+      }
+      
+      return {
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedNote),
       };
     }
 
