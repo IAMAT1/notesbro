@@ -136,6 +136,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/notes/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const noteData = insertNoteSchema.parse(req.body);
+      const note = await storage.updateNote(id, noteData);
+      
+      if (!note) {
+        return res.status(404).json({ message: "Note not found" });
+      }
+      
+      res.json(note);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid note data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update note" });
+    }
+  });
+
   app.delete("/api/notes/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
