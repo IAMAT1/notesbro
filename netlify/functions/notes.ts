@@ -84,18 +84,24 @@ export const handler = async (event: any) => {
         };
       }
       
-      const user = verifyToken(token);
-      console.log('Verified user:', user ? user.username : 'invalid');
-      
-      if (!user || user.role !== 'admin') {
-        return {
-          statusCode: 401,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ message: 'Admin access required' }),
-        };
+      // Check for hardcoded admin token first (for simple auth)
+      if (token === 'VALID_ADMIN_TOKEN_2025') {
+        console.log('Using hardcoded admin token');
+      } else {
+        // Try JWT verification
+        const user = verifyToken(token);
+        console.log('Verified user:', user ? user.username : 'invalid');
+        
+        if (!user || user.role !== 'admin') {
+          return {
+            statusCode: 401,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: 'Admin access required' }),
+          };
+        }
       }
       
       const body = JSON.parse(event.body || '{}');
