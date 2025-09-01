@@ -1,240 +1,156 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import type { Note } from "@shared/schema";
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { insertNoteSchema, loginSchema } from "@shared/schema";
+import { z } from "zod";
+import bcrypt from "bcrypt";
+import session from "express-session";
+import { generateToken, verifyToken } from "../shared/auth-utils";
 
-export default function NotesSearch() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedClass, setSelectedClass] = useState("");
-  const [selectedSubject, setSelectedSubject] = useState("");
-  const [selectedSubDomain, setSelectedSubDomain] = useState("");
-  const [selectedNoteType, setSelectedNoteType] = useState("");
-  const { toast } = useToast();
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Session middleware for security
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'notes-bro-super-secret-key-2025',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false, // Set to true in production with HTTPS
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
 
-  // Sub-domains for Science and Social Science
-  const subDomains = {
-    "Science": ["Physics", "Chemistry", "Biology"],
-    "Social Science": ["History", "Political Science", "Economics", "Geography"]
+  // Auth middleware to check admin access
+  const requireAdmin = (req: any, res: any, next: any) => {
+    // Check session-based auth first
+    if (req.session.user && req.session.user.role === 'admin') {
+      return next();
+    }
+    
+    // Check JWT token auth
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const user = verifyToken(token);
+      if (user && user.role === 'admin') {
+        req.user = user; // Store user info for later use
+        return next();
+      }
+    }
+    
+    return res.status(401).json({ message: "Admin access required" });
   };
 
-  // Get available sub-domains based on selected subject
-  const getAvailableSubDomains = () => {
-    if (!selectedSubject || !(selectedSubject in subDomains)) return [];
-    return subDomains[selectedSubject as keyof typeof subDomains] || [];
-  };
+  // Auth routes
+  app.post("/api/auth/login", async (req: any, res) => {
+    try {
+      const { username, password } = loginSchema.parse(req.body);
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
 
-  // Reset sub-domain when subject changes
-  const handleSubjectChange = (subject: string) => {
-    setSelectedSubject(subject);
-    setSelectedSubDomain(""); // Reset sub-domain when subject changes
-  };
+      // Verify password with bcrypt
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
 
-  // Build query string for API call
-  const buildQueryString = () => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('search', searchQuery);
-    if (selectedClass) params.set('class', selectedClass);
-    if (selectedSubject) params.set('subject', selectedSubject);
-    if (selectedNoteType) params.set('noteType', selectedNoteType);
-    return params.toString();
-  };
+      // Set session
+      req.session.user = { 
+        id: user.id, 
+        username: user.username, 
+        role: user.role 
+      };
 
-  const queryString = buildQueryString();
-  const apiUrl = queryString ? `/api/notes?${queryString}` : '/api/notes';
+      // Also generate JWT token for consistency with Netlify
+      const authUser = {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      };
+      const token = generateToken(authUser);
 
-  const { data: notes = [], isLoading } = useQuery<Note[]>({
-    queryKey: [apiUrl],
+      res.json({ 
+        user: authUser,
+        token
+      });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid request data" });
+    }
   });
 
-  const handleGetNotes = (driveLink: string, title: string) => {
-    if (driveLink) {
-      window.open(driveLink, "_blank");
-      toast({
-        title: "Opening Notes",
-        description: `Opening ${title} in a new tab`,
+  app.post("/api/auth/logout", (req: any, res) => {
+    req.session.destroy((err: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Could not log out" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // Notes routes
+  app.get("/api/notes", async (req, res) => {
+    try {
+      const { search, class: cls, subject, noteType } = req.query;
+      
+      const notes = await storage.searchNotes({
+        search: search as string,
+        class: cls as string,
+        subject: subject as string,
+        noteType: noteType as string,
       });
+      
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch notes" });
     }
-  };
+  });
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedClass("");
-    setSelectedSubject("");
-    setSelectedSubDomain("");
-    setSelectedNoteType("");
-  };
-
-  const getBadgeVariant = (noteType: string) => {
-    switch (noteType) {
-      case "premium":
-        return "default";
-      case "one_pager":
-        return "secondary";
-      case "animated":
-        return "destructive";
-      case "typed":
-        return "outline";
-      default:
-        return "default";
+  app.get("/api/notes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const note = await storage.getNoteById(id);
+      
+      if (!note) {
+        return res.status(404).json({ message: "Note not found" });
+      }
+      
+      res.json(note);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch note" });
     }
-  };
+  });
 
-  const formatNoteType = (noteType: string) => {
-    switch (noteType) {
-      case "one_pager":
-        return "One Pager";
-      case "animated":
-        return "Animated";
-      case "typed":
-        return "Typed";
-      case "premium":
-        return "Premium";
-      default:
-        return noteType;
+  app.post("/api/notes", requireAdmin, async (req, res) => {
+    try {
+      const noteData = insertNoteSchema.parse(req.body);
+      const note = await storage.createNote(noteData);
+      res.status(201).json(note);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid note data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create note" });
     }
-  };
+  });
 
-  return (
-    <section className="py-16 bg-card" id="subjects">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12 animate-slide-up">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4 gradient-text">Find Your Perfect Notes</h2>
-          <p className="text-base sm:text-lg text-muted-foreground px-2">Search through our comprehensive collection of study materials</p>
-        </div>
-        
-        {/* Search Bar */}
-        <div className="max-w-2xl mx-auto mb-8 animate-slide-up">
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="Search for notes, subjects, or topics..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 text-lg py-4"
-              data-testid="input-search"
-            />
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-          </div>
-        </div>
-        
-        {/* Filter Dropdowns */}
-        <div className="flex flex-wrap gap-4 mb-8 animate-slide-up justify-center">
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-40" data-testid="select-class">
-              <SelectValue placeholder="Select Class" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Class 9">Class 9</SelectItem>
-              <SelectItem value="Class 10">Class 10</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select value={selectedSubject} onValueChange={handleSubjectChange}>
-            <SelectTrigger className="w-48" data-testid="select-subject">
-              <SelectValue placeholder="Select Subject" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Mathematics">Mathematics</SelectItem>
-              <SelectItem value="English">English</SelectItem>
-              <SelectItem value="Hindi">Hindi</SelectItem>
-              <SelectItem value="French">French</SelectItem>
-              <SelectItem value="Artificial Intelligence">Artificial Intelligence</SelectItem>
-              <SelectItem value="Science">Science</SelectItem>
-              <SelectItem value="Social Science">Social Science</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {/* Sub-domain dropdown - appears when Science or Social Science is selected */}
-          {getAvailableSubDomains().length > 0 && (
-            <Select value={selectedSubDomain} onValueChange={setSelectedSubDomain}>
-              <SelectTrigger className="w-52" data-testid="select-subdomain">
-                <SelectValue placeholder={`Select ${selectedSubject} Domain`} />
-              </SelectTrigger>
-              <SelectContent>
-                {getAvailableSubDomains().map((domain) => (
-                  <SelectItem key={domain} value={domain}>{domain}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          
-          <Select value={selectedNoteType} onValueChange={setSelectedNoteType}>
-            <SelectTrigger className="w-44" data-testid="select-note-type">
-              <SelectValue placeholder="Note Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="premium">Premium Notes</SelectItem>
-              <SelectItem value="one_pager">One Pager</SelectItem>
-              <SelectItem value="animated">Animated</SelectItem>
-              <SelectItem value="typed">Typed Notes</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Button 
-            onClick={clearFilters}
-            className="bg-accent text-accent-foreground hover:bg-accent/90 px-4"
-            data-testid="button-clear-filters"
-          >
-            <Filter className="mr-2 h-4 w-4" />
-            Clear Filters
-          </Button>
-        </div>
-        
-        {/* Loading State */}
-        {isLoading && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading notes...</p>
-          </div>
-        )}
-        
-        {/* Note Results Grid */}
-        {!isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-slide-up">
-            {notes.length === 0 ? (
-              <div className="col-span-full text-center py-8">
-                <p className="text-muted-foreground text-lg">No notes found matching your criteria.</p>
-                <p className="text-sm text-muted-foreground mt-2">Try adjusting your search or filters.</p>
-              </div>
-            ) : (
-              notes.map((note) => (
-                <Card key={note.id} className="hover-lift" data-testid={`card-note-${note.id}`}>
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <Badge variant="outline" className="bg-primary/10 text-primary" data-testid={`badge-class-${note.id}`}>
-                        {note.class}
-                      </Badge>
-                      <Badge variant={getBadgeVariant(note.noteType)} data-testid={`badge-type-${note.id}`}>
-                        {formatNoteType(note.noteType)}
-                      </Badge>
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-semibold mb-2 break-words" data-testid={`text-title-${note.id}`}>
-                      {note.title}
-                    </h3>
-                    <p className="text-sm sm:text-base text-muted-foreground mb-4 break-words" data-testid={`text-description-${note.id}`}>
-                      {note.description || "No description available"}
-                    </p>
-                    <Button
-                      onClick={() => handleGetNotes(note.driveLink, note.title)}
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                      data-testid={`button-get-notes-${note.id}`}
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Get Notes
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-    </section>
-  );
+  app.delete("/api/notes/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteNote(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Note not found" });
+      }
+      
+      res.json({ message: "Note deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete note" });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
 }
