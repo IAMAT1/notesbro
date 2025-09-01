@@ -1,4 +1,5 @@
-import { db } from '../../shared/serverless-db';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
 import { notes } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
@@ -30,6 +31,21 @@ export const handler = async (event: any) => {
   }
 
   try {
+    // Create database connection using HTTP (same as working notes function)
+    if (!process.env.DATABASE_URL) {
+      return {
+        statusCode: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: 'Database not configured' }),
+      };
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+    const db = drizzle(sql);
+
     // GET /api/notes/:id - Get specific note
     if (event.httpMethod === 'GET') {
       const [note] = await db.select().from(notes).where(eq(notes.id, noteId));
