@@ -115,19 +115,6 @@ export default function Home() {
       <HeroSection />
       <NotesSearch />
       
-      {/* AdSense Compatible Ad Slot */}
-      <section className="py-8 bg-card">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-muted/30 border-2 border-dashed border-border rounded-lg p-8 text-center">
-            <p className="text-muted-foreground text-sm mb-2">Advertisement Space</p>
-            <p className="text-xs text-muted-foreground">Google AdSense integration ready</p>
-            <div className="w-full h-24 bg-muted/50 rounded-lg flex items-center justify-center mt-4">
-              <span className="text-muted-foreground text-sm">AdSense Banner (728x90)</span>
-            </div>
-          </div>
-        </div>
-      </section>
-      
       <FeaturesSection />
       <Footer />
       
