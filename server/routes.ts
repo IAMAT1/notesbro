@@ -22,10 +22,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware to check admin access
   const requireAdmin = (req: any, res: any, next: any) => {
-    if (!req.session.user || req.session.user.role !== 'admin') {
-      return res.status(401).json({ message: "Admin access required" });
+    // Check session-based auth first
+    if (req.session.user && req.session.user.role === 'admin') {
+      return next();
     }
-    next();
+    
+    // Check JWT token auth
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const user = verifyToken(token);
+      if (user && user.role === 'admin') {
+        req.user = user; // Store user info for later use
+        return next();
+      }
+    }
+    
+    return res.status(401).json({ message: "Admin access required" });
   };
 
   // Auth routes
