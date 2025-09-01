@@ -13,8 +13,27 @@ export default function NotesSearch() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedSubDomain, setSelectedSubDomain] = useState("");
   const [selectedNoteType, setSelectedNoteType] = useState("");
   const { toast } = useToast();
+
+  // Sub-domains for Science and Social Science
+  const subDomains = {
+    "Science": ["Physics", "Chemistry", "Biology"],
+    "Social Science": ["History", "Political Science", "Economics", "Geography"]
+  };
+
+  // Get available sub-domains based on selected subject
+  const getAvailableSubDomains = () => {
+    if (!selectedSubject || !(selectedSubject in subDomains)) return [];
+    return subDomains[selectedSubject as keyof typeof subDomains] || [];
+  };
+
+  // Reset sub-domain when subject changes
+  const handleSubjectChange = (subject: string) => {
+    setSelectedSubject(subject);
+    setSelectedSubDomain(""); // Reset sub-domain when subject changes
+  };
 
   // Build query string for API call
   const buildQueryString = () => {
@@ -47,6 +66,7 @@ export default function NotesSearch() {
     setSearchQuery("");
     setSelectedClass("");
     setSelectedSubject("");
+    setSelectedSubDomain("");
     setSelectedNoteType("");
   };
 
@@ -84,8 +104,8 @@ export default function NotesSearch() {
     <section className="py-16 bg-card" id="subjects">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 animate-slide-up">
-          <h2 className="text-4xl font-bold mb-4 gradient-text">Find Your Perfect Notes</h2>
-          <p className="text-lg text-muted-foreground">Search through our comprehensive collection of study materials</p>
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4 gradient-text">Find Your Perfect Notes</h2>
+          <p className="text-base sm:text-lg text-muted-foreground px-2">Search through our comprehensive collection of study materials</p>
         </div>
         
         {/* Search Bar */}
@@ -104,35 +124,48 @@ export default function NotesSearch() {
         </div>
         
         {/* Filter Dropdowns */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 animate-slide-up">
+        <div className="flex flex-wrap gap-4 mb-8 animate-slide-up justify-center">
           <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger data-testid="select-class">
+            <SelectTrigger className="w-40" data-testid="select-class">
               <SelectValue placeholder="Select Class" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Class 9">Class 9</SelectItem>
               <SelectItem value="Class 10">Class 10</SelectItem>
-              <SelectItem value="Class 11">Class 11</SelectItem>
-              <SelectItem value="Class 12">Class 12</SelectItem>
             </SelectContent>
           </Select>
           
-          <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-            <SelectTrigger data-testid="select-subject">
+          <Select value={selectedSubject} onValueChange={handleSubjectChange}>
+            <SelectTrigger className="w-48" data-testid="select-subject">
               <SelectValue placeholder="Select Subject" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Mathematics">Mathematics</SelectItem>
-              <SelectItem value="Physics">Physics</SelectItem>
-              <SelectItem value="Chemistry">Chemistry</SelectItem>
-              <SelectItem value="Biology">Biology</SelectItem>
               <SelectItem value="English">English</SelectItem>
-              <SelectItem value="History">History</SelectItem>
+              <SelectItem value="Hindi">Hindi</SelectItem>
+              <SelectItem value="French">French</SelectItem>
+              <SelectItem value="Artificial Intelligence">Artificial Intelligence</SelectItem>
+              <SelectItem value="Science">Science</SelectItem>
+              <SelectItem value="Social Science">Social Science</SelectItem>
             </SelectContent>
           </Select>
           
+          {/* Sub-domain dropdown - appears when Science or Social Science is selected */}
+          {getAvailableSubDomains().length > 0 && (
+            <Select value={selectedSubDomain} onValueChange={setSelectedSubDomain}>
+              <SelectTrigger className="w-52" data-testid="select-subdomain">
+                <SelectValue placeholder={`Select ${selectedSubject} Domain`} />
+              </SelectTrigger>
+              <SelectContent>
+                {getAvailableSubDomains().map((domain) => (
+                  <SelectItem key={domain} value={domain}>{domain}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
           <Select value={selectedNoteType} onValueChange={setSelectedNoteType}>
-            <SelectTrigger data-testid="select-note-type">
+            <SelectTrigger className="w-44" data-testid="select-note-type">
               <SelectValue placeholder="Note Type" />
             </SelectTrigger>
             <SelectContent>
@@ -145,7 +178,7 @@ export default function NotesSearch() {
           
           <Button 
             onClick={clearFilters}
-            className="bg-accent text-accent-foreground hover:bg-accent/90"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 px-4"
             data-testid="button-clear-filters"
           >
             <Filter className="mr-2 h-4 w-4" />
@@ -163,7 +196,7 @@ export default function NotesSearch() {
         
         {/* Note Results Grid */}
         {!isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-slide-up">
             {notes.length === 0 ? (
               <div className="col-span-full text-center py-8">
                 <p className="text-muted-foreground text-lg">No notes found matching your criteria.</p>
@@ -172,7 +205,7 @@ export default function NotesSearch() {
             ) : (
               notes.map((note) => (
                 <Card key={note.id} className="hover-lift" data-testid={`card-note-${note.id}`}>
-                  <CardContent className="p-6">
+                  <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between mb-4">
                       <Badge variant="outline" className="bg-primary/10 text-primary" data-testid={`badge-class-${note.id}`}>
                         {note.class}
@@ -181,10 +214,10 @@ export default function NotesSearch() {
                         {formatNoteType(note.noteType)}
                       </Badge>
                     </div>
-                    <h3 className="text-xl font-semibold mb-2" data-testid={`text-title-${note.id}`}>
+                    <h3 className="text-lg sm:text-xl font-semibold mb-2 break-words" data-testid={`text-title-${note.id}`}>
                       {note.title}
                     </h3>
-                    <p className="text-muted-foreground mb-4" data-testid={`text-description-${note.id}`}>
+                    <p className="text-sm sm:text-base text-muted-foreground mb-4 break-words" data-testid={`text-description-${note.id}`}>
                       {note.description || "No description available"}
                     </p>
                     <Button
