@@ -1,4 +1,5 @@
-import { db, initializeDefaultData } from '../../shared/serverless-db';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
 import { notes, insertNoteSchema } from '../../shared/schema';
 import { eq, and, ilike, or, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
@@ -19,8 +20,20 @@ export const handler = async (event: any) => {
   }
 
   try {
-    // Initialize default data (admin user) if needed
-    await initializeDefaultData();
+    // Create database connection using HTTP (not websockets) for Netlify
+    if (!process.env.DATABASE_URL) {
+      return {
+        statusCode: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: 'Database not configured' }),
+      };
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+    const db = drizzle(sql);
     // GET /api/notes - Get all notes with optional filters
     if (event.httpMethod === 'GET') {
       const { search, class: cls, subject, noteType } = event.queryStringParameters || {};
