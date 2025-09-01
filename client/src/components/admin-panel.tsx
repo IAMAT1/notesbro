@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus, Trash2, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,7 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [selectedSubDomain, setSelectedSubDomain] = useState("");
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [newNote, setNewNote] = useState<Partial<InsertNote>>({
     title: "",
     description: "",
@@ -93,6 +94,42 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
     }
   });
 
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ id, noteData }: { id: string; noteData: InsertNote }) => {
+      const response = await apiRequest("PUT", `/api/notes/${id}`, noteData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notes"] });
+      setEditingNote(null);
+      setNewNote({
+        title: "",
+        description: "",
+        class: "",
+        subject: "",
+        noteType: "",
+        driveLink: ""
+      });
+      setSelectedSubDomain("");
+      toast({
+        title: "Success",
+        description: "Note updated successfully!",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Update note error:", error);
+      let errorMessage = "Failed to update note. Please try again.";
+      if (error?.message) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  });
+
   const deleteNoteMutation = useMutation({
     mutationFn: async (noteId: string) => {
       await apiRequest("DELETE", `/api/notes/${noteId}`);
@@ -129,7 +166,50 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
       return;
     }
 
-    createNoteMutation.mutate(newNote as InsertNote);
+    if (editingNote) {
+      // Update existing note
+      updateNoteMutation.mutate({ id: editingNote.id, noteData: newNote as InsertNote });
+    } else {
+      // Create new note
+      createNoteMutation.mutate(newNote as InsertNote);
+    }
+  };
+
+  const handleEditNote = (note: Note) => {
+    setEditingNote(note);
+    setNewNote({
+      title: note.title,
+      description: note.description,
+      class: note.class,
+      subject: note.subject,
+      noteType: note.noteType,
+      driveLink: note.driveLink
+    });
+    
+    // Set subdomain if note is Science or Social Science
+    if (note.subject === "Science" || note.subject === "Social Science") {
+      const availableSubDomains = subDomains[note.subject as keyof typeof subDomains];
+      // Find matching subdomain from description or note content
+      const matchingSubDomain = availableSubDomains.find(domain => 
+        note.description?.includes(domain) || note.title.includes(domain)
+      );
+      if (matchingSubDomain) {
+        setSelectedSubDomain(matchingSubDomain);
+      }
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNote(null);
+    setNewNote({
+      title: "",
+      description: "",
+      class: "",
+      subject: "",
+      noteType: "",
+      driveLink: ""
+    });
+    setSelectedSubDomain("");
   };
 
   const handleDeleteNote = (noteId: string) => {
@@ -221,8 +301,17 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-5 w-5" />
-                  Add New Note
+                  {editingNote ? (
+                    <>
+                      <Edit className="h-5 w-5" />
+                      Edit Note
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-5 w-5" />
+                      Add New Note
+                    </>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -325,14 +414,28 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
                   </div>
                 </div>
                 
-                <Button 
-                  onClick={handleCreateNote}
-                  disabled={createNoteMutation.isPending}
-                  className="bg-accent text-accent-foreground hover:bg-accent/90"
-                  data-testid="button-add-note"
-                >
-                  {createNoteMutation.isPending ? "Adding..." : "Add Note"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleCreateNote}
+                    disabled={createNoteMutation.isPending || updateNoteMutation.isPending}
+                    className="bg-accent text-accent-foreground hover:bg-accent/90"
+                    data-testid={editingNote ? "button-update-note" : "button-add-note"}
+                  >
+                    {editingNote 
+                      ? (updateNoteMutation.isPending ? "Updating..." : "Update Note")
+                      : (createNoteMutation.isPending ? "Adding..." : "Add Note")
+                    }
+                  </Button>
+                  {editingNote && (
+                    <Button 
+                      onClick={handleCancelEdit}
+                      variant="outline"
+                      data-testid="button-cancel-edit"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
             
@@ -359,15 +462,26 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
                             {note.description || "No description"}
                           </p>
                         </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteNote(note.id)}
-                          disabled={deleteNoteMutation.isPending}
-                          data-testid={`button-delete-note-${note.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditNote(note)}
+                            disabled={deleteNoteMutation.isPending || editingNote?.id === note.id}
+                            data-testid={`button-edit-note-${note.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteNote(note.id)}
+                            disabled={deleteNoteMutation.isPending}
+                            data-testid={`button-delete-note-${note.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))
                   )}
