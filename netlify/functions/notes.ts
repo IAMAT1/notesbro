@@ -2,6 +2,7 @@ import { db } from '../../shared/serverless-db';
 import { notes, insertNoteSchema } from '../../shared/schema';
 import { eq, and, ilike, or, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
+import { verifyToken, extractTokenFromEvent } from '../../shared/auth-utils';
 
 export const handler = async (event: any) => {
   // Handle CORS preflight
@@ -66,11 +67,11 @@ export const handler = async (event: any) => {
 
     // POST /api/notes - Create a new note (admin only)
     if (event.httpMethod === 'POST') {
-      const authHeader = event.headers.authorization || event.headers.Authorization;
+      const token = extractTokenFromEvent(event);
       
-      console.log('Auth header:', authHeader);
+      console.log('Extracted token:', token ? 'present' : 'missing');
       
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      if (!token) {
         return {
           statusCode: 401,
           headers: {
@@ -81,18 +82,17 @@ export const handler = async (event: any) => {
         };
       }
       
-      const token = authHeader.substring(7);
-      console.log('Token:', token);
+      const user = verifyToken(token);
+      console.log('Verified user:', user ? user.username : 'invalid');
       
-      // Accept our specific admin token
-      if (token !== 'VALID_ADMIN_TOKEN_2025') {
+      if (!user || user.role !== 'admin') {
         return {
           statusCode: 401,
           headers: {
             'Access-Control-Allow-Origin': '*',
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ message: 'Invalid or expired token' }),
+          body: JSON.stringify({ message: 'Admin access required' }),
         };
       }
       
