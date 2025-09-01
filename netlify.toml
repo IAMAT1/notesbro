@@ -8,7 +8,7 @@
 
 [[redirects]]
   from = "/api/auth/login"
-  to = "/.netlify/functions/auth-login"
+  to = "/.netlify/functions/simple-auth"
   status = 200
 
 [[redirects]]
