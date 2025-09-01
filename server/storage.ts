@@ -89,6 +89,15 @@ export class DatabaseStorage implements IStorage {
     return note;
   }
 
+  async updateNote(id: string, updateData: InsertNote): Promise<Note | undefined> {
+    const [note] = await db
+      .update(notes)
+      .set(updateData)
+      .where(eq(notes.id, id))
+      .returning();
+    return note || undefined;
+  }
+
   async deleteNote(id: string): Promise<boolean> {
     const result = await db.delete(notes).where(eq(notes.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
