@@ -8,6 +8,7 @@ import Footer from "@/components/footer";
 import AdminPanel from "@/components/admin-panel";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth";
 import type { LoginRequest } from "@shared/schema";
 
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [showAdminAccess, setShowAdminAccess] = useState(false);
   const { toast } = useToast();
+  const { login } = useAuth();
 
   // Secret access methods - keyboard for desktop, tap sequence for mobile
   useEffect(() => {
@@ -74,7 +76,8 @@ export default function Home() {
       return response.json();
     },
     onSuccess: (data) => {
-      if (data.user?.role === "admin") {
+      if (data.user?.role === "admin" && data.token) {
+        login(data.user, data.token);
         setIsAdminLoggedIn(true);
         toast({
           title: "Welcome Admin!",
