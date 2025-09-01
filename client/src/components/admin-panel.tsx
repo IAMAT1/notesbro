@@ -23,6 +23,7 @@ interface AdminPanelProps {
 export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLogout }: AdminPanelProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedSubDomain, setSelectedSubDomain] = useState("");
   const [newNote, setNewNote] = useState<Partial<InsertNote>>({
     title: "",
     description: "",
@@ -34,6 +35,24 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Sub-domains for Science and Social Science
+  const subDomains = {
+    "Science": ["Physics", "Chemistry", "Biology"],
+    "Social Science": ["History", "Political Science", "Economics", "Geography"]
+  };
+
+  // Get available sub-domains based on selected subject
+  const getAvailableSubDomains = () => {
+    if (!newNote.subject || !(newNote.subject in subDomains)) return [];
+    return subDomains[newNote.subject as keyof typeof subDomains] || [];
+  };
+
+  // Reset sub-domain when subject changes
+  const handleSubjectChange = (subject: string) => {
+    setNewNote(prev => ({ ...prev, subject }));
+    setSelectedSubDomain(""); // Reset sub-domain when subject changes
+  };
 
   const { data: notes = [] } = useQuery<Note[]>({
     queryKey: ["/api/notes"],
@@ -137,10 +156,10 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-      <div className="bg-card p-8 rounded-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-fade-in">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-card p-4 sm:p-8 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-fade-in">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-primary">Admin Dashboard</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-primary break-words">Admin Dashboard</h2>
           <div className="flex gap-2">
             {isLoggedIn && (
               <Button variant="outline" onClick={handleLogout} data-testid="button-logout">
@@ -202,7 +221,7 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="note-title">Title *</Label>
                     <Input
@@ -236,7 +255,7 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <Label>Class *</Label>
                     <Select value={newNote.class} onValueChange={(value) => setNewNote(prev => ({ ...prev, class: value }))}>
@@ -246,28 +265,44 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
                       <SelectContent>
                         <SelectItem value="Class 9">Class 9</SelectItem>
                         <SelectItem value="Class 10">Class 10</SelectItem>
-                        <SelectItem value="Class 11">Class 11</SelectItem>
-                        <SelectItem value="Class 12">Class 12</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
                   <div>
                     <Label>Subject *</Label>
-                    <Select value={newNote.subject} onValueChange={(value) => setNewNote(prev => ({ ...prev, subject: value }))}>
+                    <Select value={newNote.subject} onValueChange={handleSubjectChange}>
                       <SelectTrigger data-testid="select-note-subject">
                         <SelectValue placeholder="Select Subject" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Mathematics">Mathematics</SelectItem>
-                        <SelectItem value="Physics">Physics</SelectItem>
-                        <SelectItem value="Chemistry">Chemistry</SelectItem>
-                        <SelectItem value="Biology">Biology</SelectItem>
                         <SelectItem value="English">English</SelectItem>
-                        <SelectItem value="History">History</SelectItem>
+                        <SelectItem value="Hindi">Hindi</SelectItem>
+                        <SelectItem value="French">French</SelectItem>
+                        <SelectItem value="Artificial Intelligence">Artificial Intelligence</SelectItem>
+                        <SelectItem value="Science">Science</SelectItem>
+                        <SelectItem value="Social Science">Social Science</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  {/* Sub-domain dropdown - appears when Science or Social Science is selected */}
+                  {getAvailableSubDomains().length > 0 && (
+                    <div>
+                      <Label>Domain *</Label>
+                      <Select value={selectedSubDomain} onValueChange={setSelectedSubDomain}>
+                        <SelectTrigger data-testid="select-note-subdomain">
+                          <SelectValue placeholder={`Select ${newNote.subject} Domain`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getAvailableSubDomains().map((domain) => (
+                            <SelectItem key={domain} value={domain}>{domain}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   
                   <div>
                     <Label>Note Type *</Label>
@@ -307,15 +342,15 @@ export default function AdminPanel({ isOpen, onClose, isLoggedIn, onLogin, onLog
                     <p className="text-muted-foreground text-center py-4">No notes found.</p>
                   ) : (
                     notes.map((note) => (
-                      <div key={note.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`note-item-${note.id}`}>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="font-semibold" data-testid={`text-note-title-${note.id}`}>{note.title}</h4>
+                      <div key={note.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4" data-testid={`note-item-${note.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h4 className="font-semibold break-words" data-testid={`text-note-title-${note.id}`}>{note.title}</h4>
                             <Badge variant="outline" data-testid={`badge-note-class-${note.id}`}>{note.class}</Badge>
                             <Badge variant="secondary" data-testid={`badge-note-subject-${note.id}`}>{note.subject}</Badge>
                             <Badge data-testid={`badge-note-type-${note.id}`}>{note.noteType}</Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground" data-testid={`text-note-description-${note.id}`}>
+                          <p className="text-sm text-muted-foreground break-words" data-testid={`text-note-description-${note.id}`}>
                             {note.description || "No description"}
                           </p>
                         </div>
