@@ -1,4 +1,4 @@
-import { db } from '../../shared/serverless-db';
+import { db, initializeDefaultData } from '../../shared/serverless-db';
 import { notes, insertNoteSchema } from '../../shared/schema';
 import { eq, and, ilike, or, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
@@ -19,6 +19,8 @@ export const handler = async (event: any) => {
   }
 
   try {
+    // Initialize default data (admin user) if needed
+    await initializeDefaultData();
     // GET /api/notes - Get all notes with optional filters
     if (event.httpMethod === 'GET') {
       const { search, class: cls, subject, noteType } = event.queryStringParameters || {};
